@@ -129,8 +129,11 @@ AND id<>?
             24 * 60 * 60 * 1000
           );
 
-        await db.query(
+        const [oldUserRows] = await db.query('SELECT email, email_verified FROM users WHERE id=?', [userId]);
+        const oldEmail = oldUserRows[0].email;
+        const oldEmailVerified = oldUserRows[0].email_verified;
 
+        await db.query(
           `
 UPDATE users
 
@@ -160,23 +163,21 @@ WHERE id=?
 
           `${process.env.APP_URL}/auth/verify-email?token=${token}`;
 
-        await transporter.sendMail({
-
-          from:
-            process.env.MAIL_USER,
-
-          to: cleanEmail,
-
-          subject:
-            "Verifikasi Email Baru",
-
-          html:
-            verifyEmailTemplate(
-              name,
-              link
-            )
-
-        });
+        try {
+          await transporter.sendMail({
+            from: process.env.MAIL_FROM || process.env.MAIL_USER,
+            to: cleanEmail,
+            subject: "Verifikasi Email Baru",
+            html: verifyEmailTemplate(name, link)
+          });
+        } catch (mailErr) {
+          // Rollback email change
+          await db.query(
+            `UPDATE users SET email=?, email_verified=?, verification_token=NULL, verification_expired=NULL WHERE id=?`,
+            [oldEmail, oldEmailVerified, userId]
+          );
+          throw new Error("Gagal mengirim email verifikasi. Pastikan konfigurasi SMTP di server Anda benar.");
+        }
 
         return res.json({
 
@@ -235,7 +236,7 @@ WHERE id=?
       res.status(500).json({
 
         message:
-          "Server Error"
+          err.message || "Server Error"
 
       });
 

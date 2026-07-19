@@ -10,10 +10,19 @@ router.get('/daily', auth, isAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT 
-        COUNT(*) AS total_transaksi,
-        IFNULL(SUM(total),0) AS total_penjualan
-      FROM sales
-      WHERE DATE(created_at) = CURDATE()
+        IFNULL(SUM(transaksi),0) AS total_transaksi,
+        IFNULL(SUM(penjualan),0) AS total_penjualan
+      FROM (
+        SELECT 1 AS transaksi, total AS penjualan 
+        FROM sales 
+        WHERE DATE(created_at) = CURDATE()
+        
+        UNION ALL
+        
+        SELECT 1 AS transaksi, total AS penjualan 
+        FROM orders 
+        WHERE DATE(created_at) = CURDATE() AND status = 'selesai'
+      ) t
     `);
     res.json(rows[0]);
   } catch (err) {
@@ -27,11 +36,19 @@ router.get('/monthly', auth, isAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT 
-        COUNT(*) AS total_transaksi,
-        IFNULL(SUM(total),0) AS total_penjualan
-      FROM sales
-      WHERE MONTH(created_at) = MONTH(CURDATE())
-      AND YEAR(created_at) = YEAR(CURDATE())
+        IFNULL(SUM(transaksi),0) AS total_transaksi,
+        IFNULL(SUM(penjualan),0) AS total_penjualan
+      FROM (
+        SELECT 1 AS transaksi, total AS penjualan 
+        FROM sales 
+        WHERE MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE())
+        
+        UNION ALL
+        
+        SELECT 1 AS transaksi, total AS penjualan 
+        FROM orders 
+        WHERE MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE()) AND status = 'selesai'
+      ) t
     `);
     res.json(rows[0]);
   } catch (err) {
@@ -91,48 +108,95 @@ router.get('/sales-chart', auth, isAdmin, async (req, res) => {
   let query = '';
 
   if (type === 'daily') {
-    // ✅ DATE_FORMAT supaya label selalu konsisten YYYY-MM-DD
-    // ✅ INTERVAL 6 DAY supaya include hari ini = 7 hari total
     query = `
       SELECT 
-        DATE_FORMAT(s.created_at, '%Y-%m-%d') AS label,
-        IFNULL(SUM(si.quantity * si.price), 0) AS penjualan,
-        IFNULL(SUM(si.quantity * (si.price - si.cost_price)), 0) AS profit
-      FROM sale_items si
-      JOIN sales s ON s.id = si.sale_id
-      WHERE DATE(s.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-      GROUP BY DATE_FORMAT(s.created_at, '%Y-%m-%d')
+        label,
+        IFNULL(SUM(penjualan), 0) AS penjualan,
+        IFNULL(SUM(profit), 0) AS profit
+      FROM (
+        SELECT 
+          DATE_FORMAT(s.created_at, '%Y-%m-%d') AS label,
+          (si.quantity * si.price) AS penjualan,
+          (si.quantity * (si.price - si.cost_price)) AS profit
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id
+        WHERE DATE(s.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        
+        UNION ALL
+        
+        SELECT 
+          DATE_FORMAT(o.created_at, '%Y-%m-%d') AS label,
+          (oi.quantity * oi.price) AS penjualan,
+          (oi.quantity * (oi.price - p.cost_price)) AS profit
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        JOIN products p ON p.id = oi.product_id
+        WHERE DATE(o.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND o.status = 'selesai'
+      ) t
+      GROUP BY label
       ORDER BY label ASC
     `;
   }
 
   if (type === 'monthly') {
-    // ✅ DATE_FORMAT supaya label selalu YYYY-MM-DD dengan zero-padding
     query = `
       SELECT
-        DATE_FORMAT(s.created_at, '%Y-%m-%d') AS label,
-        IFNULL(SUM(si.quantity * si.price), 0) AS penjualan,
-        IFNULL(SUM(si.quantity * (si.price - si.cost_price)), 0) AS profit
-      FROM sales s
-      JOIN sale_items si ON si.sale_id = s.id
-      WHERE MONTH(s.created_at) = MONTH(CURDATE())
-      AND YEAR(s.created_at) = YEAR(CURDATE())
-      GROUP BY DATE_FORMAT(s.created_at, '%Y-%m-%d')
-      ORDER BY label
+        label,
+        IFNULL(SUM(penjualan), 0) AS penjualan,
+        IFNULL(SUM(profit), 0) AS profit
+      FROM (
+        SELECT 
+          DATE_FORMAT(s.created_at, '%Y-%m-%d') AS label,
+          (si.quantity * si.price) AS penjualan,
+          (si.quantity * (si.price - si.cost_price)) AS profit
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id
+        WHERE MONTH(s.created_at) = MONTH(CURDATE()) AND YEAR(s.created_at) = YEAR(CURDATE())
+        
+        UNION ALL
+        
+        SELECT 
+          DATE_FORMAT(o.created_at, '%Y-%m-%d') AS label,
+          (oi.quantity * oi.price) AS penjualan,
+          (oi.quantity * (oi.price - p.cost_price)) AS profit
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        JOIN products p ON p.id = oi.product_id
+        WHERE MONTH(o.created_at) = MONTH(CURDATE()) AND YEAR(o.created_at) = YEAR(CURDATE()) AND o.status = 'selesai'
+      ) t
+      GROUP BY label
+      ORDER BY label ASC
     `;
   }
 
   if (type === 'yearly') {
     query = `
       SELECT
-        DATE_FORMAT(s.created_at, '%Y-%m') AS label,
-        IFNULL(SUM(si.quantity * si.price), 0) AS penjualan,
-        IFNULL(SUM(si.quantity * (si.price - si.cost_price)), 0) AS profit
-      FROM sales s
-      JOIN sale_items si ON si.sale_id = s.id
-      WHERE YEAR(s.created_at) = YEAR(CURDATE())
-      GROUP BY DATE_FORMAT(s.created_at, '%Y-%m')
-      ORDER BY label
+        label,
+        IFNULL(SUM(penjualan), 0) AS penjualan,
+        IFNULL(SUM(profit), 0) AS profit
+      FROM (
+        SELECT 
+          DATE_FORMAT(s.created_at, '%Y-%m') AS label,
+          (si.quantity * si.price) AS penjualan,
+          (si.quantity * (si.price - si.cost_price)) AS profit
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id
+        WHERE YEAR(s.created_at) = YEAR(CURDATE())
+        
+        UNION ALL
+        
+        SELECT 
+          DATE_FORMAT(o.created_at, '%Y-%m') AS label,
+          (oi.quantity * oi.price) AS penjualan,
+          (oi.quantity * (oi.price - p.cost_price)) AS profit
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        JOIN products p ON p.id = oi.product_id
+        WHERE YEAR(o.created_at) = YEAR(CURDATE()) AND o.status = 'selesai'
+      ) t
+      GROUP BY label
+      ORDER BY label ASC
     `;
   }
 
@@ -154,17 +218,31 @@ router.get('/summary', auth, isAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT
-        IFNULL(SUM(si.quantity * si.price), 0)                          AS total_penjualan,
-        IFNULL(SUM(si.quantity * si.cost_price), 0)                     AS total_modal,
-        IFNULL(SUM(si.quantity * (si.price - si.cost_price)), 0)        AS total_profit,
-        COUNT(DISTINCT si.sale_id)                                       AS total_transaksi,
-        ROUND(
-          IFNULL(
-            SUM(si.quantity * (si.price - si.cost_price))
-            / NULLIF(SUM(si.quantity * si.cost_price), 0) * 100,
-          0),
-        2)                                                               AS margin_profit
-      FROM sale_items si
+        IFNULL(SUM(t.penjualan), 0) AS total_penjualan,
+        IFNULL(SUM(t.modal), 0) AS total_modal,
+        IFNULL(SUM(t.profit), 0) AS total_profit,
+        SUM(t.transaksi) AS total_transaksi,
+        ROUND(IFNULL(SUM(t.profit) / NULLIF(SUM(t.modal), 0) * 100, 0), 2) AS margin_profit
+      FROM (
+        SELECT 
+          (si.quantity * si.price) AS penjualan,
+          (si.quantity * si.cost_price) AS modal,
+          (si.quantity * (si.price - si.cost_price)) AS profit,
+          COUNT(DISTINCT si.sale_id) AS transaksi
+        FROM sale_items si
+
+        UNION ALL
+
+        SELECT 
+          (oi.quantity * oi.price) AS penjualan,
+          (oi.quantity * p.cost_price) AS modal,
+          (oi.quantity * (oi.price - p.cost_price)) AS profit,
+          COUNT(DISTINCT oi.order_id) AS transaksi
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        JOIN products p ON p.id = oi.product_id
+        WHERE o.status = 'selesai'
+      ) t
     `);
     res.json(rows[0]);
   } catch (err) {

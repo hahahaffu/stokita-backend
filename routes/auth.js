@@ -77,6 +77,7 @@ router.post(
 
     }
 
+    let newUserId;
     try {
 
       /* cek email */
@@ -167,7 +168,7 @@ NULL
         ]
       );
 
-      let newUserId = result.insertId;
+      newUserId = result.insertId;
 
       await auditLog({
         user_id: newUserId,
@@ -181,24 +182,16 @@ NULL
 
         `${process.env.APP_URL}/auth/verify-email?token=${verificationToken}`;
 
-      await transporter.sendMail({
-
-        from:
-          process.env.MAIL_FROM,
-
-        to:
-          cleanEmail,
-
-        subject:
-          "Verifikasi Email Stokita",
-
-        html:
-          verifyEmailTemplate(
-            name,
-            verifyLink
-          )
-
-      });
+      try {
+        await transporter.sendMail({
+          from: process.env.MAIL_FROM,
+          to: cleanEmail,
+          subject: "Verifikasi Email Stokita",
+          html: verifyEmailTemplate(name, verifyLink)
+        });
+      } catch (mailErr) {
+        throw new Error("Gagal mengirim email verifikasi. Pastikan konfigurasi SMTP di server Anda benar.");
+      }
 
       res.json({
 
@@ -212,12 +205,9 @@ NULL
 
     } catch (err) {
 
-      if (typeof newUserId !== "undefined" && newUserId) {
+      if (newUserId) {
         await db.query(
-          `
-  DELETE FROM users
-  WHERE id=?
-  `,
+          `DELETE FROM users WHERE id=?`,
           [newUserId]
         );
       }
@@ -229,8 +219,7 @@ NULL
 
       res.status(500)
         .json({
-          message:
-            "Server error"
+          message: err.message || "Server error"
         });
 
     }
