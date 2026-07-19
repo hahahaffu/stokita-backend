@@ -225,18 +225,18 @@ router.get('/summary', auth, isAdmin, async (req, res) => {
         ROUND(IFNULL(SUM(t.profit) / NULLIF(SUM(t.modal), 0) * 100, 0), 2) AS margin_profit
       FROM (
         SELECT 
-          (si.quantity * si.price) AS penjualan,
-          (si.quantity * si.cost_price) AS modal,
-          (si.quantity * (si.price - si.cost_price)) AS profit,
+          SUM(si.quantity * si.price) AS penjualan,
+          SUM(si.quantity * si.cost_price) AS modal,
+          SUM(si.quantity * (si.price - si.cost_price)) AS profit,
           COUNT(DISTINCT si.sale_id) AS transaksi
         FROM sale_items si
 
         UNION ALL
 
         SELECT 
-          (oi.quantity * oi.price) AS penjualan,
-          (oi.quantity * p.cost_price) AS modal,
-          (oi.quantity * (oi.price - p.cost_price)) AS profit,
+          SUM(oi.quantity * oi.price) AS penjualan,
+          SUM(oi.quantity * p.cost_price) AS modal,
+          SUM(oi.quantity * (oi.price - p.cost_price)) AS profit,
           COUNT(DISTINCT oi.order_id) AS transaksi
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
