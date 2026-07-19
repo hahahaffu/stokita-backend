@@ -190,7 +190,8 @@ NULL
           html: verifyEmailTemplate(name, verifyLink)
         });
       } catch (mailErr) {
-        throw new Error("Gagal mengirim email verifikasi. Pastikan konfigurasi SMTP di server Anda benar.");
+        console.error("SMTP ERROR:", err);
+        throw err;
       }
 
       res.json({
