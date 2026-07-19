@@ -190,8 +190,8 @@ NULL
           html: verifyEmailTemplate(name, verifyLink)
         });
       } catch (mailErr) {
-        console.error("SMTP ERROR:", err);
-        throw err;
+        console.error("SMTP ERROR:", mailErr);
+        throw mailErr;
       }
 
       res.json({
