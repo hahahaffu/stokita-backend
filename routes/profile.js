@@ -382,4 +382,31 @@ router.post(
   }
 );
 
+/* ================= DELETE FOTO ================= */
+router.delete(
+  "/photo",
+  auth,
+  async (req, res) => {
+    try {
+      const [userData] = await db.query(
+        "SELECT photo_public_id FROM users WHERE id = ?",
+        [req.user.id]
+      );
+
+      if (userData[0]?.photo_public_id) {
+        await cloudinary.uploader.destroy(userData[0].photo_public_id);
+      }
+
+      await db.query(
+        "UPDATE users SET photo = NULL, photo_public_id = NULL WHERE id = ?",
+        [req.user.id]
+      );
+
+      res.json({ message: "Foto berhasil dihapus" });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  }
+);
+
 module.exports = router;
