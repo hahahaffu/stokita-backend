@@ -14,8 +14,8 @@ require("dotenv").config();
 const SECRET_KEY =
   process.env.JWT_SECRET;
 
-const transporter =
-  require("../utils/mailer");
+const sendVerificationEmail =
+  require("../utils/brevoMailer");
 
 const {
   verifyEmailTemplate
@@ -183,11 +183,16 @@ NULL
         `${process.env.APP_URL}/auth/verify-email?token=${verificationToken}`;
 
       try {
-        await transporter.sendMail({
-          from: process.env.MAIL_FROM,
+        await sendVerificationEmail({
+
           to: cleanEmail,
+
+          name,
+
           subject: "Verifikasi Email Stokita",
-          html: verifyEmailTemplate(name, verifyLink)
+
+          html: verifyEmailTemplate(name, verifyLink),
+
         });
       } catch (mailErr) {
         console.error("SMTP ERROR:", mailErr);
@@ -406,22 +411,15 @@ WHERE id=?
 
       `${process.env.APP_URL}/auth/verify-email?token=${token}`;
 
-    await transporter.sendMail({
+    await sendVerificationEmail({
 
-      from:
-        process.env.MAIL_FROM,
+      to: cleanEmail,
 
-      to:
-        cleanEmail,
+      name,
 
-      subject:
-        "Verifikasi Email Stokita",
+      subject: "Verifikasi Email Stokita",
 
-      html:
-        verifyEmailTemplate(
-          user.name,
-          link
-        )
+      html: verifyEmailTemplate(name, verifyLink),
 
     });
 
