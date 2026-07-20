@@ -411,17 +411,17 @@ WHERE id=?
 
       `${process.env.APP_URL}/auth/verify-email?token=${token}`;
 
-    await sendVerificationEmail({
-
-      to: cleanEmail,
-
-      name,
-
-      subject: "Verifikasi Email Stokita",
-
-      html: verifyEmailTemplate(name, verifyLink),
-
-    });
+    try {
+      await sendVerificationEmail({
+        to: cleanEmail,
+        name: user.name,
+        subject: "Verifikasi Email Stokita",
+        html: verifyEmailTemplate(user.name, link),
+      });
+    } catch (mailErr) {
+      console.error("SMTP ERROR:", mailErr);
+      throw mailErr;
+    }
 
     res.json({
 

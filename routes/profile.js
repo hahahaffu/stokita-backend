@@ -9,8 +9,8 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const auditLog = require("../utils/auditLog");
 
-const transporter =
-  require("../utils/mailer");
+const sendVerificationEmail =
+  require("../utils/brevoMailer");
 
 const {
   verifyEmailTemplate
@@ -164,9 +164,9 @@ WHERE id=?
           `${process.env.APP_URL}/auth/verify-email?token=${token}`;
 
         try {
-          await transporter.sendMail({
-            from: process.env.MAIL_FROM || process.env.MAIL_USER,
+          await sendVerificationEmail({
             to: cleanEmail,
+            name: name,
             subject: "Verifikasi Email Baru",
             html: verifyEmailTemplate(name, link)
           });
