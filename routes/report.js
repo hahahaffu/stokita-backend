@@ -127,10 +127,9 @@ router.get('/sales-chart', auth, isAdmin, async (req, res) => {
         SELECT 
           DATE_FORMAT(o.created_at, '%Y-%m-%d') AS label,
           (oi.quantity * oi.price) AS penjualan,
-          (oi.quantity * (oi.price - p.cost_price)) AS profit
+          (oi.quantity * (oi.price - oi.cost_price)) AS profit
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
-        JOIN products p ON p.id = oi.product_id
         WHERE DATE(o.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND o.status = 'selesai'
       ) t
       GROUP BY label
@@ -158,10 +157,9 @@ router.get('/sales-chart', auth, isAdmin, async (req, res) => {
         SELECT 
           DATE_FORMAT(o.created_at, '%Y-%m-%d') AS label,
           (oi.quantity * oi.price) AS penjualan,
-          (oi.quantity * (oi.price - p.cost_price)) AS profit
+          (oi.quantity * (oi.price - oi.cost_price)) AS profit
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
-        JOIN products p ON p.id = oi.product_id
         WHERE MONTH(o.created_at) = MONTH(CURDATE()) AND YEAR(o.created_at) = YEAR(CURDATE()) AND o.status = 'selesai'
       ) t
       GROUP BY label
@@ -189,10 +187,9 @@ router.get('/sales-chart', auth, isAdmin, async (req, res) => {
         SELECT 
           DATE_FORMAT(o.created_at, '%Y-%m') AS label,
           (oi.quantity * oi.price) AS penjualan,
-          (oi.quantity * (oi.price - p.cost_price)) AS profit
+          (oi.quantity * (oi.price - oi.cost_price)) AS profit
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
-        JOIN products p ON p.id = oi.product_id
         WHERE YEAR(o.created_at) = YEAR(CURDATE()) AND o.status = 'selesai'
       ) t
       GROUP BY label
@@ -235,12 +232,11 @@ router.get('/summary', auth, isAdmin, async (req, res) => {
 
         SELECT 
           SUM(oi.quantity * oi.price) AS penjualan,
-          SUM(oi.quantity * p.cost_price) AS modal,
-          SUM(oi.quantity * (oi.price - p.cost_price)) AS profit,
+          SUM(oi.quantity * oi.cost_price) AS modal,
+          SUM(oi.quantity * (oi.price - oi.cost_price)) AS profit,
           COUNT(DISTINCT oi.order_id) AS transaksi
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
-        JOIN products p ON p.id = oi.product_id
         WHERE o.status = 'selesai'
       ) t
     `);

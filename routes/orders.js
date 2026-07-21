@@ -66,6 +66,7 @@ SELECT
 cart.*,
 products.name,
 products.price,
+products.cost_price,
 products.stock
 
 FROM cart
@@ -164,15 +165,17 @@ INSERT INTO order_items
 order_id,
 product_id,
 quantity,
-price
+price,
+cost_price
 )
-VALUES(?,?,?,?)
+VALUES(?,?,?,?,?)
 `,
 [
 orderId,
 item.product_id,
 item.quantity,
-item.price
+item.price,
+item.cost_price
 ]
 );
 
