@@ -597,4 +597,23 @@ AND deleted_at IS NULL
   });
 
 
+/* ================= SAVE FCM TOKEN ================= */
+
+router.post("/save-fcm", auth, async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ message: "Token FCM tidak valid" });
+
+    await db.query(
+      `UPDATE users SET fcm_token = ? WHERE id = ?`,
+      [token, req.user.id]
+    );
+    
+    res.json({ success: true, message: "FCM Token berhasil disimpan" });
+  } catch (err) {
+    console.error("SAVE FCM ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
